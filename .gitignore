@@ -26,3 +26,6 @@ dist/
 # Local vector store and metadata
 .chroma/
 faiss_store/
+# Local database and personal files
+/db/
+The Almanack of Naval Ravikant PDF.pdf
