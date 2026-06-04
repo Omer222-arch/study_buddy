@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     embedding_model_name: str = "all-MiniLM-L6-v2"
     embedding_device: str = "cpu"
     openai_api_key: str | None = None
+    gemini_api_key: str | None = None
     tavily_api_key: str | None = None
     pinecone_api_key: str | None = None
     pinecone_environment: str | None = None

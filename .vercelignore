@@ -1,0 +1,10 @@
+# Ignore local data and deployment artifacts
+.git/
+db/
+**/*.sqlite3
+**/*.pdf
+**/__pycache__/
+**/*.pyc
+tests/
+netlify/
+*.md

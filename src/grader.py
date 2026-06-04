@@ -6,6 +6,7 @@ from typing import Protocol, Sequence
 
 from pydantic import BaseModel, Field, ValidationError
 
+from config.settings import settings
 from .graph_state import ChunkGrade, GradedChunk
 
 
@@ -21,6 +22,35 @@ class MockLLMClient:
         return prompt
 
 
+class GeminiLLMClient:
+    def __init__(self, api_key: str | None = None, model: str = "gemini-2.5-flash") -> None:
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+        except ImportError:
+            raise ImportError(
+                "langchain-google-genai is not installed. "
+                "Please install it with: pip install langchain-google-genai"
+            )
+        
+        self.api_key = api_key or settings.gemini_api_key
+        if not self.api_key:
+            raise ValueError(
+                "Gemini API key is not set. "
+                "Please set GEMINI_API_KEY in your .env file or pass it to GeminiLLMClient."
+            )
+        
+        self.model = ChatGoogleGenerativeAI(
+            model=model,
+            api_key=self.api_key,
+            temperature=0.7,
+        )
+
+    async def generate(self, prompt: str) -> str:
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, lambda: self.model.invoke(prompt))
+        return response.content
+
+
 class GradeResponse(BaseModel):
     graded_chunks: list[GradedChunk]
     reasoning: str
@@ -28,7 +58,14 @@ class GradeResponse(BaseModel):
 
 class GraderNode:
     def __init__(self, llm_client: LLMClientProtocol | None = None) -> None:
-        self.llm_client = llm_client or MockLLMClient()
+        if llm_client is None:
+            # Use Gemini 2.5 Flash by default if API key is available
+            if settings.gemini_api_key:
+                llm_client = GeminiLLMClient(settings.gemini_api_key)
+            else:
+                # Fall back to mock client if no API key
+                llm_client = MockLLMClient()
+        self.llm_client = llm_client
 
     async def grade_chunks(self, query: str, chunks: Sequence[str]) -> list[GradedChunk]:
         prompt = self._build_prompt(query, chunks)

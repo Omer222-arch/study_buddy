@@ -11,16 +11,9 @@ A local Retrieval-Augmented Generation (RAG) study assistant with PDF ingestion,
 - `.env.example` - configuration template
 - `requirements.txt` - Python dependencies
 
-## Week 3.3 / Week 4 Delivery
+## Getting Started
 
-This branch adds containerization and a Streamlit UI for local deployment:
-
-- `Dockerfile` - API container definition
-- `docker-compose.yml` - API + Streamlit UI orchestration
-- `src/streamlit_app.py` - browser-based frontend for ingestion and chat
-- `.dockerignore` - excluded files for Docker builds
-
-## Run locally without Docker
+### Run locally
 
 1. Install dependencies:
 
@@ -45,43 +38,69 @@ python -m src.app
 streamlit run src/streamlit_app.py
 ```
 
-## Run with Docker
+The UI will be available at `http://localhost:8501`.
 
-### Build the image
-
-```powershell
-docker build -t studybuddy:latest .
-```
-
-### Run the API container only
+5. Start the React frontend in a second terminal:
 
 ```powershell
-docker run --rm -p 8000:8000 -v "%cd%/db:/app/db" studybuddy:latest
+cd frontend
+npm install
+npm run dev
 ```
 
-### Run API + UI together
+## Deploy React Frontend to Netlify
 
-```powershell
-docker compose up --build
-```
+This project is configured for Netlify deployment using `netlify.toml`.
 
-Then open:
+1. In the Netlify dashboard, connect your repository.
+2. Use the following build settings if needed:
+   - Build command: `cd frontend && npm install && npm run build`
+   - Publish directory: `frontend/dist`
+3. If you want to use Netlify Functions for API routing, keep the `netlify/functions` folder.
+4. Deploy the site.
 
-- API: `http://localhost:8000`
-- Streamlit UI: `http://localhost:8501`
+Netlify will build the Vite React app and publish the static site from `frontend/dist`.
 
-## Cloud Deployment
+## Configuring Gemini 2.5 Flash LLM
 
-A cloud deployment workflow is included at `.github/workflows/docker-publish.yml`.
-It builds the Docker image and publishes it to GitHub Container Registry (GHCR):
+This project now supports Google's Gemini 2.5 Flash model for intelligent chunk grading.
 
-- `ghcr.io/<owner>/studybuddy:latest`
-- `ghcr.io/<owner>/studybuddy:<commit-sha>`
+### Setup
 
-For GCP Cloud Run, there is also a dedicated workflow at `.github/workflows/gcp-cloud-run.yml`.
-It builds the container image, pushes it to Google Container Registry, and deploys directly to Cloud Run.
+1. **Get a Gemini API Key:**
+   - Visit [Google AI Studio](https://aistudio.google.com/apikey)
+   - Create an API key for your project
 
-See `CLOUD_DEPLOYMENT.md` for the next step, required GCP secrets, and provider-specific guidance.
+2. **Configure your environment:**
+   - Copy `.env.example` to `.env`:
+     ```powershell
+     cp .env.example .env
+     ```
+   - Add your Gemini API key:
+     ```
+     GEMINI_API_KEY=your_api_key_here
+     ```
+
+3. **Install/Update dependencies:**
+   ```powershell
+   python -m pip install -r requirements.txt
+   ```
+
+### How it Works
+
+- **Gemini 2.5 Flash** is used for intelligent chunk grading in the CRAG pipeline
+- When a query is received, Gemini evaluates retrieved documents and grades them as `CORRECT`, `AMBIGUOUS`, or `IRRELEVANT`
+- If all chunks are relevant, the pipeline generates an answer directly
+- If chunks are ambiguous or irrelevant, it falls back to web search before generating
+- If no Gemini API key is configured, the system gracefully falls back to a heuristic grading method
+
+### Model Details
+
+- **Model:** `gemini-2.5-flash`
+- **Temperature:** 0.7 (balanced creativity and consistency)
+- **Use Case:** Chunk relevance grading in RAG pipeline
+
+The React app will be available at `http://localhost:5173`.
 
 ## Environment
 
@@ -100,12 +119,64 @@ Copy `.env.example` to `.env` to customize settings such as:
 - `POST /ingest` - upload a PDF file for ingestion
 - `POST /chat` - query the ingested documents
 
-## Continuous Integration
+## Deployment
 
-A GitHub Actions workflow can be added to validate the Python package and run tests on push or pull request. The workflow should install dependencies, execute the test suite, and build the Docker image to ensure both the service and container artifacts are valid.
+### Vercel (Recommended for API Backend)
+
+1. Install Vercel CLI:
+```powershell
+npm install -g vercel
+```
+
+2. Deploy from the project root:
+```powershell
+vercel
+```
+
+3. Configure environment variables in the Vercel dashboard:
+   - `OPENAI_API_KEY`
+   - `TAVILY_API_KEY`
+   - `CHROMA_PERSIST_DIRECTORY` (optional)
+   - `STUDY_BUDDY_API_URL` if you want Streamlit to call the deployed API directly
+
+4. The backend API will be available at `https://<your-project>.vercel.app/api`
+   - `GET /api/health`
+   - `POST /api/ingest`
+   - `POST /api/chat`
+
+### Netlify (Alternative for API Backend)
+
+1. Install Netlify CLI:
+```powershell
+npm install -g netlify-cli
+```
+
+2. Deploy from the project root:
+```powershell
+netlify deploy --prod
+```
+
+3. Configure environment variables in the Netlify dashboard under **Site settings > Build & deploy > Environment**:
+   - `OPENAI_API_KEY`
+   - `TAVILY_API_KEY`
+   - `CHROMA_PERSIST_DIRECTORY` (optional)
+
+4. The Netlify function is configured at `netlify/functions/api.py` and will serve your FastAPI app via `/api/*`.
+
+### Streamlit UI Deployment
+
+Deploy the Streamlit UI separately to [Streamlit Cloud](https://streamlit.io/cloud):
+
+1. Push your repo to GitHub.
+2. Go to [share.streamlit.io](https://share.streamlit.io).
+3. Click "New app" and connect your GitHub repo.
+4. Select your branch and `src/streamlit_app.py` as the main file.
+5. Set `STUDY_BUDDY_API_URL` in Streamlit Cloud to your deployed API base URL, for example:
+   - `https://<your-project>.vercel.app/api`
+   - or `https://<your-netlify-site>.netlify.app/api`
 
 ## Notes
 
 - The local Chroma store persists embeddings to `db/chroma`.
 - The Streamlit UI submits PDF uploads and chat queries to the API.
-- Docker Compose launches the API and UI together with shared volume persistence.
+- For Vercel/Netlify, configure the API URL in Streamlit settings to point to your deployed backend.

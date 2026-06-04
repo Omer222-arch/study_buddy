@@ -1,0 +1,19 @@
+{
+  "buildCommand": "pip install -r requirements.txt",
+  "installCommand": "pip install -r requirements.txt",
+  "functions": {
+    "api/**/*.py": {
+      "runtime": "python@3.12",
+      "excludeFiles": "{**/__pycache__/**,**/*.pyc,**/*.sqlite3,**/*.pdf,**/.git/**,**/tests/**,**/db/**,**/netlify/**,**/*.md}"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    }
+  ],
+  "env": {
+    "PYTHONUNBUFFERED": "1"
+  }
+}
